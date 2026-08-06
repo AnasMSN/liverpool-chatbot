@@ -1,0 +1,22 @@
+PREMIER LEAGUE STANDINGS
+
+1. Arsenal FC — P38 W26 D7 L5 GD44 Pts85
+2. Manchester City FC — P38 W23 D9 L6 GD42 Pts78
+3. Manchester United FC — P38 W20 D11 L7 GD19 Pts71
+4. Aston Villa FC — P38 W19 D8 L11 GD7 Pts65
+5. Liverpool FC — P38 W17 D9 L12 GD10 Pts60
+6. AFC Bournemouth — P38 W13 D18 L7 GD4 Pts57
+7. Sunderland AFC — P38 W14 D12 L12 GD-6 Pts54
+8. Brighton & Hove Albion FC — P38 W14 D11 L13 GD6 Pts53
+9. Brentford FC — P38 W14 D11 L13 GD3 Pts53
+10. Chelsea FC — P38 W14 D10 L14 GD6 Pts52
+11. Fulham FC — P38 W15 D7 L16 GD-4 Pts52
+12. Newcastle United FC — P38 W14 D7 L17 GD-2 Pts49
+13. Everton FC — P38 W13 D10 L15 GD-3 Pts49
+14. Leeds United FC — P38 W11 D14 L13 GD-7 Pts47
+15. Crystal Palace FC — P38 W11 D12 L15 GD-10 Pts45
+16. Nottingham Forest FC — P38 W11 D11 L16 GD-3 Pts44
+17. Tottenham Hotspur FC — P38 W10 D11 L17 GD-9 Pts41
+18. West Ham United FC — P38 W10 D9 L19 GD-19 Pts39
+19. Burnley FC — P38 W4 D10 L24 GD-37 Pts22
+20. Wolverhampton Wanderers FC — P38 W3 D11 L24 GD-41 Pts20

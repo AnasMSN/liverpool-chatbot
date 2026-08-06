@@ -1,0 +1,9 @@
+requests
+wikipedia-api==0.7.3
+beautifulsoup4
+sentence-transformers
+chromadb
+ollama
+streamlit
+python-dotenv
+tqdm
