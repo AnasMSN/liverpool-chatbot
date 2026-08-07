@@ -60,6 +60,34 @@ Run the whole thing with `make all` (see `Makefile`), or step by step with
   links. `rag/query_engine.py` calls `load_dotenv()` at import time so
   these flags reach `os.environ` under `streamlit run app.py` too (see
   gotcha below).
+- **`rag/web_cache.py`** — every URL that `web_search.py` gets back from
+  Tavily is scraped (via `requests` + `BeautifulSoup`, stripping
+  script/style/nav/footer/header) and saved as a `.txt` file under
+  `data/raw/web_cache/`, with the outcome recorded by URL in
+  `data/processed/web_cache_index.json`:
+  - already `"scraped"` → reused straight from disk, no network call.
+  - already `"failed"` → not retried that session; `web_search.py` just
+    falls back to Tavily's own snippet for that turn.
+  Because the cached pages live under `data/raw/`, the next `make
+  build-db` run folds them into the ChromaDB collection like any other
+  source — so a site that answered one question becomes part of the
+  *local* knowledge base for similar future questions, instead of
+  needing a fresh web search + scrape every time. `web_cache/` and
+  `web_cache_index.json` are gitignored: unlike the Wikipedia data
+  (CC BY-SA), scraped news/club-site content isn't necessarily
+  redistributable, so it's kept local-only.
+- **`rag/web_usage.py`** — meters Tavily calls against
+  `TAVILY_MONTHLY_LIMIT` (default 1000, Tavily's free-tier quota) in
+  `data/processed/tavily_usage.json`, resetting automatically each
+  calendar month. `web_search.py` calls `record_search()` once per
+  actual Tavily request (a request spends a credit even with no useful
+  results) and checks `quota_exceeded()` before making one at all — once
+  the quota's used up, `web_search_available()` goes `False` and the
+  chatbot quietly falls back to local-only retrieval until next month.
+  `app.py`'s sidebar calls `web_search_status()` to show a live
+  used/limit count (and a warning once exhausted), so this is visible in
+  the UI, not just the logs. Gitignored like the other local-state
+  files.
 - **`scripts/scrape_wikipedia.py`** — pulls the page titles listed in
   `PAGES` via `wikipediaapi.Wikipedia(...)` and writes plain text to
   `data/raw/wikipedia/`. Add/remove titles there to change coverage. Note:

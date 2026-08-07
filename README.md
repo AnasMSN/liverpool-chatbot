@@ -97,6 +97,19 @@ After changing `.env`, restart the app (`Ctrl+C`, then `streamlit run
 app.py` again) — Streamlit doesn't reload `.env` on its own for a
 running session.
 
+Every page a web search turns up also gets scraped once and cached under
+`data/raw/web_cache/` (tracked in `data/processed/web_cache_index.json`),
+so the same URL is never fetched twice — a repeat or similar question
+reuses the saved page instead of hitting the site (or Tavily) again. Run
+`make build-db` periodically to fold those cached pages into the local
+vector store permanently, the same as Wikipedia/API data.
+
+Tavily calls are metered against `TAVILY_MONTHLY_LIMIT` (defaults to
+1,000, Tavily's free-tier quota) — the sidebar in the app shows a live
+used/limit count, and once it's used up the chatbot automatically falls
+back to local-only retrieval until the quota resets next month. Bump
+`TAVILY_MONTHLY_LIMIT` in `.env` if you upgrade your Tavily plan.
+
 ## Notes on scaling down / up
 
 - **Less VRAM headroom?** Swap the model in `rag/query_engine.py` for
