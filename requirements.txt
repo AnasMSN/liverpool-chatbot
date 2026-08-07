@@ -7,3 +7,4 @@ ollama
 streamlit
 python-dotenv
 tqdm
+tavily-python==0.7.27

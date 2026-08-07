@@ -44,6 +44,6 @@ if question:
             if result["sources"]:
                 with st.expander("Sources"):
                     for src in result["sources"]:
-                        st.write(f"- {src}")
+                        st.markdown(f"- {src}")
 
     st.session_state.messages.append({"role": "assistant", "content": result["answer"]})

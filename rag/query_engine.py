@@ -9,7 +9,12 @@ from __future__ import annotations
 import os
 import chromadb
 import ollama
+from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
+
+from .web_search import search_web, web_search_available
+
+load_dotenv()
 
 DB_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed", "chroma_db")
 COLLECTION_NAME = "liverpool_fc"
@@ -22,10 +27,20 @@ LLM_MODEL = "qwen2.5:7b"
 TOP_K = 5
 
 SYSTEM_PROMPT = """You are a knowledgeable Liverpool FC assistant.
-Answer the user's question using ONLY the context provided below.
-If the context doesn't contain the answer, say you don't have that
-information rather than guessing. Keep answers concise and factual,
-and mention specifics (names, dates, scores) when they're in the context.
+Answer the user's question using ONLY the context provided below, and use the
+conversation history above it to understand what the user means (e.g. a short
+follow-up like "not him?" refers back to the previous turn). If the context
+doesn't contain the answer, say you don't have that information rather than
+guessing. Keep answers concise and factual, and mention specifics (names,
+dates, scores) when they're in the context. Some context items are from live
+web search and are labeled with a URL as their source — when you use one of
+those, cite the URL in your answer.
+"""
+
+CONDENSE_PROMPT = """Given the conversation history and a follow-up question,
+rewrite the follow-up into a standalone question that captures the user's full
+intent, using the history for context. If the follow-up is already standalone,
+return it unchanged. Reply with ONLY the rewritten question, nothing else.
 """
 
 
@@ -46,8 +61,25 @@ class RAGEngine:
             chunks.append({"text": doc, "source": meta.get("source", "unknown")})
         return chunks
 
+    def _condense_question(self, question: str, history: list[dict]) -> str:
+        convo = "\n".join(f"{m['role']}: {m['content']}" for m in history)
+        messages = [
+            {"role": "system", "content": CONDENSE_PROMPT},
+            {
+                "role": "user",
+                "content": f"Conversation so far:\n{convo}\n\nFollow-up question: {question}",
+            },
+        ]
+        response = ollama.chat(model=LLM_MODEL, messages=messages)
+        return response["message"]["content"].strip()
+
     def answer(self, question: str, history: list[dict] | None = None) -> dict:
-        retrieved = self.retrieve(question)
+        search_question = self._condense_question(question, history) if history else question
+
+        retrieved = self.retrieve(search_question)
+        if web_search_available():
+            retrieved = retrieved + search_web(search_question)
+
         context = "\n\n---\n\n".join(
             f"[Source: {c['source']}]\n{c['text']}" for c in retrieved
         )
@@ -58,7 +90,7 @@ class RAGEngine:
         messages.append(
             {
                 "role": "user",
-                "content": f"Context:\n{context}\n\nQuestion: {question}",
+                "content": f"Context:\n{context}\n\nQuestion: {search_question}",
             }
         )
 

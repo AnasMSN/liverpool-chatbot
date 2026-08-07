@@ -78,6 +78,25 @@ Football data goes stale fast. Re-run `fetch_football_api.py` and
 fixtures and standings current. Wikipedia content changes slowly, so
 re-scraping weekly is plenty.
 
+## 6. Optional: live web search citations
+
+By default the chatbot only answers from the local dataset. To let it also
+pull in fresh web results (cited by URL) via the [Tavily](https://tavily.com)
+API (free tier: 1,000 searches/month):
+
+```bash
+# in .env
+WEB_SEARCH_ENABLED=true
+TAVILY_API_KEY=your_key_here
+```
+
+Set `WEB_SEARCH_ENABLED=false` (or leave `TAVILY_API_KEY` empty) to turn it
+back off — the chatbot silently falls back to local-only retrieval.
+
+After changing `.env`, restart the app (`Ctrl+C`, then `streamlit run
+app.py` again) — Streamlit doesn't reload `.env` on its own for a
+running session.
+
 ## Notes on scaling down / up
 
 - **Less VRAM headroom?** Swap the model in `rag/query_engine.py` for
