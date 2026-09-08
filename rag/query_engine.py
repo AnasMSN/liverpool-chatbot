@@ -1,6 +1,6 @@
 """
 Core RAG logic: embed the user's question, retrieve the most relevant
-chunks from ChromaDB, and ask a local Ollama model to answer using only
+chunks from ChromaDB, and ask a Groq-hosted LLM to answer using only
 that retrieved context.
 """
 
@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import os
 import chromadb
-import ollama
 from dotenv import load_dotenv
+from groq import Groq
 from sentence_transformers import SentenceTransformer
 
 from .web_search import search_web, web_search_available
@@ -20,9 +20,11 @@ DB_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed", "chr
 COLLECTION_NAME = "liverpool_fc"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
-# Swap this for "phi4-mini" if you need more VRAM headroom,
-# or point ollama.chat at a different host for a bigger/remote model.
-LLM_MODEL = "qwen2.5:7b"
+# Free-tier Groq model (30 req/min, 1K req/day as of Sept 2026). Swap for
+# "openai/gpt-oss-20b" for faster/cheaper responses at lower quality.
+# Check https://console.groq.com/docs/deprecations before relying on a
+# model long-term — Groq retires free-tier models on a rolling basis.
+LLM_MODEL = "openai/gpt-oss-120b"
 
 TOP_K = 5
 
@@ -49,6 +51,9 @@ class RAGEngine:
         self.embedder = SentenceTransformer(EMBEDDING_MODEL)
         client = chromadb.PersistentClient(path=DB_DIR)
         self.collection = client.get_collection(COLLECTION_NAME)
+        # Reads GROQ_API_KEY from the environment (set via .env locally,
+        # or via Streamlit Community Cloud's app secrets when deployed).
+        self.llm_client = Groq()
 
     def retrieve(self, question: str, top_k: int = TOP_K) -> list[dict]:
         query_embedding = self.embedder.encode([question]).tolist()
@@ -70,8 +75,8 @@ class RAGEngine:
                 "content": f"Conversation so far:\n{convo}\n\nFollow-up question: {question}",
             },
         ]
-        response = ollama.chat(model=LLM_MODEL, messages=messages)
-        return response["message"]["content"].strip()
+        response = self.llm_client.chat.completions.create(model=LLM_MODEL, messages=messages)
+        return response.choices[0].message.content.strip()
 
     def answer(self, question: str, history: list[dict] | None = None) -> dict:
         search_question = self._condense_question(question, history) if history else question
@@ -94,10 +99,10 @@ class RAGEngine:
             }
         )
 
-        response = ollama.chat(model=LLM_MODEL, messages=messages)
+        response = self.llm_client.chat.completions.create(model=LLM_MODEL, messages=messages)
 
         return {
-            "answer": response["message"]["content"],
+            "answer": response.choices[0].message.content,
             "sources": sorted({c["source"] for c in retrieved}),
         }
 

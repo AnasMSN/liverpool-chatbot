@@ -1,14 +1,12 @@
 PYTHON := venv/bin/python
 PIP := venv/bin/pip
-LLM_MODEL := qwen2.5:7b
 
-.PHONY: venv install pull-model scrape fetch build-db data run all clean clean-data help
+.PHONY: venv install scrape fetch build-db data run all clean clean-data help
 
 help:
 	@echo "Targets:"
 	@echo "  make venv        create venv/ (Python 3.9+)"
 	@echo "  make install     install requirements.txt into venv/"
-	@echo "  make pull-model  ollama pull $(LLM_MODEL)"
 	@echo "  make scrape      scrape Wikipedia pages -> data/raw/wikipedia/"
 	@echo "  make fetch       fetch fixtures/standings -> data/raw/football_api/"
 	@echo "  make build-db    chunk + embed + write ChromaDB -> data/processed/chroma_db/"
@@ -23,9 +21,6 @@ venv:
 
 install: venv
 	$(PIP) install -r requirements.txt
-
-pull-model:
-	ollama pull $(LLM_MODEL)
 
 scrape:
 	$(PYTHON) scripts/scrape_wikipedia.py

@@ -1,8 +1,10 @@
 # Liverpool FC RAG Chatbot
 
-A local, retrieval-augmented chatbot that answers questions about Liverpool FC —
-history, players, trophies, and (near-)current stats — designed to run entirely
-on a single PC with an 8GB GPU.
+A retrieval-augmented chatbot that answers questions about Liverpool FC —
+history, players, trophies, and (near-)current stats. Embeddings and the
+vector store run locally (or on whatever host runs the app); LLM inference
+runs on [Groq](https://groq.com)'s free-tier API, so there's no local GPU
+or Ollama install required.
 
 ## How it works
 
@@ -10,16 +12,16 @@ on a single PC with an 8GB GPU.
 Wikipedia + Football API data
         │
         ▼
-   chunk_and_embed.py  ──► embeddings (sentence-transformers)
+   build_vector_store.py  ──► embeddings (sentence-transformers)
         │
         ▼
-   ChromaDB (local vector store)
+   ChromaDB (vector store, committed under data/processed/chroma_db)
         │
         ▼
    query_engine.py  ──► retrieves relevant chunks
         │
         ▼
-   Ollama (Qwen 3.5 9B, Q4_K_M)  ──► generates the final answer
+   Groq API (openai/gpt-oss-120b)  ──► generates the final answer
         │
         ▼
    app.py (Streamlit chat UI)
@@ -27,9 +29,9 @@ Wikipedia + Football API data
 
 ## 1. Prerequisites
 
-- Python 3.10+
-- An NVIDIA GPU with 8GB VRAM (CPU-only also works, just slower)
-- [Ollama](https://ollama.com) installed
+- Python 3.10+ (the committed `venv/` here is pinned to 3.9.19 — see
+  `CLAUDE.md` for the compatibility gotchas that come with that)
+- A free [Groq](https://console.groq.com) account and API key
 
 ## 2. Setup
 
@@ -40,11 +42,18 @@ source venv/bin/activate        # on Windows: venv\Scripts\activate
 
 pip install -r requirements.txt
 
-# pull the local LLM (about 6.6GB on disk)
-ollama pull qwen2.5:7b          # or qwen3.5:9b if available on your Ollama version
+# get a free API key from https://console.groq.com/keys and set it
+export GROQ_API_KEY="your_key_here"         # Windows: set GROQ_API_KEY=your_key_here
 
 # get a free API key from football-data.org and set it
 export FOOTBALL_API_KEY="your_key_here"     # Windows: set FOOTBALL_API_KEY=your_key_here
+```
+
+Both keys can instead go in a `.env` file in the repo root:
+
+```
+GROQ_API_KEY=your_key_here
+FOOTBALL_API_KEY=your_key_here
 ```
 
 ## 3. Build the dataset
@@ -110,12 +119,44 @@ used/limit count, and once it's used up the chatbot automatically falls
 back to local-only retrieval until the quota resets next month. Bump
 `TAVILY_MONTHLY_LIMIT` in `.env` if you upgrade your Tavily plan.
 
+## Deploying (Streamlit Community Cloud)
+
+The app has no local-only dependency left (Groq handles inference over
+the network), so it can run on a small free host instead of your own
+machine:
+
+1. Push this repo to GitHub (the `data/processed/chroma_db/` and
+   `data/raw/` directories are already committed, so the deployed app
+   has a working knowledge base out of the box — no build step needed).
+2. Go to [share.streamlit.io](https://share.streamlit.io), sign in with
+   GitHub, and create a new app pointing at this repo's `app.py`.
+3. In the app's **Settings → Secrets**, paste:
+   ```toml
+   GROQ_API_KEY = "your_key_here"
+   FOOTBALL_API_KEY = "your_key_here"
+   # optional:
+   WEB_SEARCH_ENABLED = "true"
+   TAVILY_API_KEY = "your_key_here"
+   ```
+   Root-level keys in Streamlit Cloud's secrets are exposed as real
+   environment variables at runtime, so `rag/query_engine.py`'s
+   `load_dotenv()` + `os.environ` reads work unchanged — no code
+   changes needed to support this.
+4. Deploy. Rebuilding the dataset (`make data`) still has to happen on
+   a machine that can run the scraper/fetcher — commit the refreshed
+   `data/` directory and push to update the deployed app, since
+   football fixtures/standings go stale and Streamlit Cloud has no
+   built-in scheduler to re-run `fetch_football_api.py` for you.
+
 ## Notes on scaling down / up
 
-- **Less VRAM headroom?** Swap the model in `rag/query_engine.py` for
-  `phi4-mini` (~3.5GB) — small quality tradeoff, much more headroom.
+- **Want a faster/cheaper model?** Swap `LLM_MODEL` in
+  `rag/query_engine.py` for `openai/gpt-oss-20b`. Check
+  [Groq's deprecations page](https://console.groq.com/docs/deprecations)
+  before depending on any model long-term — free-tier models get
+  retired on a rolling basis.
 - **Want higher quality answers and don't mind an API cost?** Swap the
-  Ollama call in `rag/query_engine.py` for an Anthropic/OpenAI API call.
+  Groq call in `rag/query_engine.py` for an Anthropic/OpenAI API call.
   Retrieval logic doesn't need to change at all.
 
 ## Legal / scraping etiquette

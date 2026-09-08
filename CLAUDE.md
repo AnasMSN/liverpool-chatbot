@@ -1,8 +1,11 @@
 # Liverpool FC RAG Chatbot — repo context
 
-Local, retrieval-augmented chatbot answering questions about Liverpool FC
-(history, players, trophies, near-current fixtures/standings). Everything
-runs on-machine: local embeddings, local vector store, local LLM via Ollama.
+Retrieval-augmented chatbot answering questions about Liverpool FC
+(history, players, trophies, near-current fixtures/standings). Embeddings
+and the vector store run wherever the app runs (local machine or a host
+like Streamlit Community Cloud); LLM inference calls out to the Groq API
+(free tier) instead of a local model, so there's no GPU/Ollama dependency
+anymore.
 
 ## Pipeline
 
@@ -14,7 +17,7 @@ scripts/fetch_football_api.py   -> data/raw/football_api/*.txt
 scripts/build_vector_store.py   -> data/processed/chroma_db/  (ChromaDB, collection "liverpool_fc")
                                         |
                                         v
-rag/query_engine.py (RAGEngine) -> embeds question, retrieves top-k chunks, asks Ollama
+rag/query_engine.py (RAGEngine) -> embeds question, retrieves top-k chunks, asks Groq
                                         |
                                         v
 app.py                          -> Streamlit chat UI, holds st.session_state.messages
@@ -27,7 +30,8 @@ Run the whole thing with `make all` (see `Makefile`), or step by step with
 
 - **`rag/query_engine.py`** — the entire RAG logic lives here.
   - `RAGEngine.__init__`: loads `sentence-transformers` model
-    (`all-MiniLM-L6-v2`) and opens the ChromaDB collection.
+    (`all-MiniLM-L6-v2`), opens the ChromaDB collection, and builds a
+    `groq.Groq()` client (reads `GROQ_API_KEY` from the environment).
   - `RAGEngine.retrieve(question)`: embeds `question` and does a top-`TOP_K`
     (5) similarity query against ChromaDB.
   - `RAGEngine._condense_question(question, history)`: when there's chat
@@ -37,13 +41,21 @@ Run the whole thing with `make all` (see `Makefile`), or step by step with
   - `RAGEngine.answer(question, history)`: condenses (if history present),
     retrieves from ChromaDB, optionally appends live web results (see
     below), builds a `Context:\n...\n\nQuestion: ...` user message, sends
-    `[system, *history, user]` to `ollama.chat(model=LLM_MODEL, ...)`.
+    `[system, *history, user]` to
+    `self.llm_client.chat.completions.create(model=LLM_MODEL, ...)`.
   - `SYSTEM_PROMPT`: instructs the model to answer only from retrieved
     context but also to use chat history to interpret intent, and to cite
     URLs when a context item came from web search. `LLM_MODEL =
-    "qwen2.5:7b"` — swap to `phi4-mini` for less VRAM, or swap the
-    `ollama.chat` call for an Anthropic/OpenAI call if you don't mind API
-    cost (retrieval logic doesn't need to change).
+    "openai/gpt-oss-120b"` (Groq free tier) — swap to `openai/gpt-oss-20b`
+    for faster/cheaper responses, or swap the Groq call for an
+    Anthropic/OpenAI call if you don't mind API cost (retrieval logic
+    doesn't need to change). Check
+    https://console.groq.com/docs/deprecations before depending on a
+    model long-term — Groq retires free-tier models on a rolling basis
+    (e.g. `llama-3.3-70b-versatile`, an earlier obvious choice, was
+    already shut down by the time this integration was written in
+    September 2026, which is why `openai/gpt-oss-120b` was picked
+    instead).
 - **`rag/web_search.py`** — optional live web search via the
   [Tavily](https://tavily.com) API (free tier: 1,000 searches/month),
   gated by two env vars:
@@ -137,13 +149,35 @@ var directly (not through `rag/query_engine.py`), it needs its own
 
 ```bash
 make install      # venv + pip install -r requirements.txt
-make pull-model   # ollama pull qwen2.5:7b
 make data         # scrape + fetch + build-db (needs FOOTBALL_API_KEY in .env)
-make run          # streamlit run app.py
+make run          # streamlit run app.py (needs GROQ_API_KEY in .env)
 ```
 
-`.env` holds `FOOTBALL_API_KEY` — never committed (`.gitignore` excludes
-`.env`, `venv`, `_screenshot`).
+`.env` holds `FOOTBALL_API_KEY` and `GROQ_API_KEY` — never committed
+(`.gitignore` excludes `.env`, `venv`, `_screenshot`).
+
+## Deployment
+
+`data/raw/` and `data/processed/chroma_db/` are committed to git (not
+gitignored), so a fresh clone/deploy already has a working knowledge
+base without running the scrape/fetch/build-db pipeline. Combined with
+Groq for inference, this means the app has no local-GPU dependency and
+can run on a small free host instead of the original PC.
+
+Documented path: **Streamlit Community Cloud**, deploying `app.py`
+straight from this GitHub repo. Secrets (`GROQ_API_KEY`,
+`FOOTBALL_API_KEY`, optionally `WEB_SEARCH_ENABLED`/`TAVILY_API_KEY`) go
+in the app's Settings → Secrets as root-level TOML keys — Streamlit
+Cloud exposes root-level secrets as real `os.environ` values, so the
+existing `load_dotenv()` + `os.environ` reads in `rag/query_engine.py`
+and `rag/web_search.py` work unchanged there, with no `st.secrets` glue
+code needed. See the "Deploying" section in `README.md` for the
+click-through steps.
+
+Caveat: nothing re-runs `fetch_football_api.py` on the deployed host —
+there's no scheduler there. To refresh fixtures/standings, run `make
+data` locally and push the updated `data/` directory; the deployed app
+picks it up on its next redeploy.
 
 ## Known limitations
 
