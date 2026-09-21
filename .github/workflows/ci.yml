@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Syntax check
+        run: python -m compileall app.py rag scripts
+
+      - name: Import check
+        env:
+          GROQ_API_KEY: dummy-key-for-import-check
+        run: |
+          python -c "import rag.query_engine"
+          python -c "import rag.web_search"
+          python -c "import rag.web_cache"
+          python -c "import rag.web_usage"

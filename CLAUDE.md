@@ -179,6 +179,30 @@ there's no scheduler there. To refresh fixtures/standings, run `make
 data` locally and push the updated `data/` directory; the deployed app
 picks it up on its next redeploy.
 
+`chat.anasmahasin.site` fronts the deployed Streamlit app via a static
+`index.html` (repo root) that iframes it with Streamlit's `?embed=true`
+mode, hosted as a separate Cloudflare Workers/Pages static-upload
+project with that custom domain attached. `index.html` isn't imported
+by any Python code — it exists purely for that Cloudflare upload. If
+the Streamlit app is ever made private, this iframe breaks (Streamlit's
+viewer-auth flow doesn't work cross-origin in a frame).
+
+## CI
+
+`.github/workflows/ci.yml` runs on every push/PR to `main`: installs
+`requirements.txt` on Python 3.9 (matching the pinned local `venv/`),
+then `python -m compileall` over `app.py`/`rag`/`scripts` and an
+`import`-only check of each `rag/*.py` module. This exists because
+Streamlit Community Cloud auto-redeploys straight from `main` on every
+push with no review gate of its own — this workflow is the only thing
+that would catch an import/syntax break before (or as) it reaches the
+live site. It does not import `app.py` itself (that would instantiate
+`RAGEngine()` at module scope via `load_engine()`, triggering a real
+`sentence-transformers` model download and ChromaDB load in CI); it
+only exercises the `rag/` modules, which is enough to catch the kind of
+mistake this repo already made once (a stray `import ollama` left in
+after the Groq migration would have failed this check immediately).
+
 ## Known limitations
 
 - Retrieval has no re-ranking; it's a single dense-embedding top-k query.
