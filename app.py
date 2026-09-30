@@ -8,10 +8,10 @@ import streamlit as st
 from rag.query_engine import RAGEngine
 from rag.web_search import web_search_status
 
-st.set_page_config(page_title="Liverpool FC Chatbot", page_icon="⚽", layout="centered")
+st.set_page_config(page_title="Anas Mahasin Chatbot", page_icon="⚽", layout="centered")
 
-st.title("⚽ Liverpool FC Chatbot")
-st.caption("Ask about Liverpool's history, players, and recent results — answered from a local RAG pipeline.")
+st.title("⚽ Anas Mahasin Chatbot")
+st.caption("Ask about who is Anas Mahasin.")
 
 with st.sidebar:
     st.subheader("Web search")
@@ -42,7 +42,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-question = st.chat_input("Ask something about Liverpool FC...")
+question = st.chat_input("Ask something about Anas Mahasin...")
 
 if question:
     st.session_state.messages.append({"role": "user", "content": question})
